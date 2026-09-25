@@ -1,0 +1,26 @@
+# OS & IDE
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+*.iml
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Backend
+backend/target/
+backend/.mvn/
+backend/*.jar
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+
+# Env files
+.env
