@@ -62,4 +62,18 @@ class JobFetchServiceTest {
         assertEquals(BigDecimal.valueOf(500000), dto.getSalaryMin());
         assertTrue(dto.getIsFresherEligible());
     }
+
+    @Test
+    void testLiveAdzunaFetchWithRealCredentials() {
+        JobFetchService liveService = new JobFetchService(
+            jobRepository,
+            objectMapper,
+            "c6058c3a",
+            "94b0098325a92b0b46deb65be5652787",
+            "https://api.adzuna.com/v1/api/jobs/in/search"
+        );
+        int added = liveService.fetchAndSaveJobs();
+        System.out.println("LIVE FETCH ADDED JOBS COUNT: " + added);
+        assertTrue(added > 0, "Should have fetched at least 1 job from live Adzuna API");
+    }
 }

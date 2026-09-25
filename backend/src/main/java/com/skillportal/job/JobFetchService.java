@@ -109,20 +109,25 @@ public class JobFetchService {
     }
 
     private int fetchQueryJobs(String query) {
-        String uri = UriComponentsBuilder.fromHttpUrl(baseUrl + "/1")
+        java.net.URI uri = UriComponentsBuilder.fromHttpUrl(baseUrl + "/1")
                 .queryParam("app_id", appId)
                 .queryParam("app_key", appKey)
                 .queryParam("what", query)
                 .queryParam("results_per_page", 20)
                 .queryParam("content-type", "application/json")
-                .toUriString();
+                .build()
+                .encode()
+                .toUri();
 
-        log.debug("Calling Adzuna API for query: {}", query);
+        log.info("Calling Adzuna API at URI: {}", uri);
 
         String responseBody = restClient.get()
                 .uri(uri)
                 .retrieve()
                 .body(String.class);
+
+        log.info("Adzuna response body for '{}': {}", query,
+                responseBody != null ? responseBody.substring(0, Math.min(250, responseBody.length())) : "null");
 
         if (responseBody == null || responseBody.isBlank()) {
             return 0;
