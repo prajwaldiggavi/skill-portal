@@ -44,39 +44,36 @@ public class AuthService {
 
     @Transactional
     public AuthDto.AuthResponse login(AuthDto.LoginRequest request) {
-        Optional<User> userOpt = userRepository.findByEmail(request.getIdentifier());
-        if (userOpt.isEmpty()) {
-            userOpt = userRepository.findByStudentId(request.getIdentifier());
-        }
-        if (userOpt.isEmpty()) {
-            throw new UnauthorizedException("Invalid credentials");
-        }
-        return authenticateUser(request.getIdentifier(), request.getPassword(), userOpt.get().getRole());
+        User user = findUserByIdentifier(request.getIdentifier());
+        return processAuthentication(user, request.getPassword(), user.getRole());
     }
 
     @Transactional
     public AuthDto.AuthResponse loginStudent(AuthDto.LoginRequest request) {
-        return authenticateUser(request.getIdentifier(), request.getPassword(), "ROLE_STUDENT");
+        User user = findUserByIdentifier(request.getIdentifier());
+        return processAuthentication(user, request.getPassword(), "ROLE_STUDENT");
     }
 
     @Transactional
     public AuthDto.AuthResponse loginAdmin(AuthDto.LoginRequest request) {
-        return authenticateUser(request.getIdentifier(), request.getPassword(), "ROLE_ADMIN");
+        User user = findUserByIdentifier(request.getIdentifier());
+        return processAuthentication(user, request.getPassword(), "ROLE_ADMIN");
     }
 
-    private AuthDto.AuthResponse authenticateUser(String identifier, String rawPassword, String expectedRole) {
-        Optional<User> userOpt = userRepository.findByEmail(identifier);
-        if (userOpt.isEmpty()) {
-            userOpt = userRepository.findByStudentId(identifier);
-        }
-
-        if (userOpt.isEmpty()) {
+    private User findUserByIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
             throw new UnauthorizedException("Invalid credentials");
         }
+        String cleanId = identifier.trim();
+        Optional<User> userOpt = userRepository.findByEmail(cleanId);
+        if (userOpt.isEmpty()) {
+            userOpt = userRepository.findByStudentId(cleanId);
+        }
+        return userOpt.orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
+    }
 
-        User user = userOpt.get();
-
-        // Check if account is temporarily locked (Requirement 7 & 32)
+    private AuthDto.AuthResponse processAuthentication(User user, String rawPassword, String expectedRole) {
+        // Check if account is temporarily locked
         if (user.isLocked()) {
             long minutesRemaining = Duration.between(Instant.now(), user.getLockedUntil()).toMinutes() + 1;
             throw new ApiException(
@@ -86,7 +83,7 @@ public class AuthService {
             );
         }
 
-        // Validate Role separation (Requirement 6 & 7)
+        // Validate Role separation
         if (!user.getRole().equals(expectedRole)) {
             throw new UnauthorizedException("Unauthorized: Account does not have " + expectedRole + " privileges");
         }
@@ -107,8 +104,10 @@ public class AuthService {
             }
         }
 
-        // Reset failed login count on successful auth
-        userRepository.resetFailedAttempts(user.getId());
+        // High-performance optimization: Only reset failed login count if it was greater than 0
+        if (user.getFailedLoginAttempts() > 0) {
+            userRepository.resetFailedAttempts(user.getId());
+        }
 
         return createAuthResponse(user);
     }
@@ -126,7 +125,7 @@ public class AuthService {
         User user = userRepository.findById(tokenRecord.getUserId())
                 .orElseThrow(() -> new UnauthorizedException("User not found"));
 
-        // Refresh token rotation (Requirement 7 & 32)
+        // Refresh token rotation
         refreshTokenRepository.revokeToken(request.getRefreshToken());
 
         return createAuthResponse(user);
@@ -150,7 +149,6 @@ public class AuthService {
 
         String newHash = passwordEncoder.encode(request.getNewPassword());
         userRepository.updatePassword(userId, newHash);
-        // Revoke all existing sessions for security
         refreshTokenRepository.revokeAllUserTokens(userId);
     }
 
