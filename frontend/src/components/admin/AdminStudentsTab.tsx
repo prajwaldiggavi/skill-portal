@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   Users,
   Search,
@@ -18,7 +19,9 @@ import {
   History,
   X,
   RefreshCw,
-  Filter
+  Filter,
+  QrCode,
+  ShieldCheck
 } from 'lucide-react';
 import api from '../../api/client';
 import {
@@ -50,7 +53,8 @@ export const AdminStudentsTab: React.FC<AdminStudentsTabProps> = ({ batches }) =
   const [resetPwdStudent, setResetPwdStudent] = useState<StudentAdminItem | null>(null);
   const [viewingDetail, setViewingDetail] = useState<StudentDetailResponse | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailTab, setDetailTab] = useState<'profile' | 'attendance' | 'assignments' | 'tests' | 'coding' | 'activity'>('profile');
+  const [detailTab, setDetailTab] = useState<'profile' | 'attendance' | 'assignments' | 'tests' | 'coding' | 'activity' | 'qr'>('profile');
+  const [regeneratingQr, setRegeneratingQr] = useState(false);
 
   // Form states for Add Student
   const [addForm, setAddForm] = useState({
@@ -129,6 +133,50 @@ export const AdminStudentsTab: React.FC<AdminStudentsTabProps> = ({ batches }) =
       alert(err.response?.data?.message || 'Failed to load student details.');
     } finally {
       setLoadingDetail(false);
+    }
+  };
+
+  // View student QR directly
+  const handleViewQr = async (userId: number) => {
+    setLoadingDetail(true);
+    setDetailTab('qr');
+    try {
+      const res = await api.get(`/admin/students/${userId}`);
+      setViewingDetail(res.data?.data || null);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to load student QR details.');
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  // Regenerate student QR
+  const handleRegenerateQr = async (studentId: number) => {
+    if (!window.confirm('Regenerate this student QR identity? Any previous physical or digital QR tokens will be invalidated immediately.')) {
+      return;
+    }
+    setRegeneratingQr(true);
+    try {
+      const res = await api.post(`/attendance/students/${studentId}/regenerate-qr`);
+      const newToken = res.data?.data?.qrToken;
+      if (viewingDetail && viewingDetail.profile) {
+        setViewingDetail({
+          ...viewingDetail,
+          profile: {
+            ...viewingDetail.profile,
+            qrToken: newToken,
+            qrStatus: 'ACTIVE',
+          },
+        });
+      }
+      setStudents((prev) =>
+        prev.map((s) => (s.studentId === studentId ? { ...s, qrToken: newToken, qrStatus: 'ACTIVE' } : s))
+      );
+      showNotification('Student QR token regenerated and encrypted successfully!');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to regenerate student QR code.');
+    } finally {
+      setRegeneratingQr(false);
     }
   };
 
@@ -408,6 +456,15 @@ export const AdminStudentsTab: React.FC<AdminStudentsTabProps> = ({ batches }) =
                       {student.points} pts
                     </td>
                     <td className="py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                      {/* View & Manage QR Code */}
+                      <button
+                        onClick={() => handleViewQr(student.userId)}
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-[#00c2ff] hover:bg-cyan-50 dark:hover:bg-cyan-950/50 transition-colors"
+                        title="View & Manage QR Identity"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                      </button>
+
                       {/* View Details */}
                       <button
                         onClick={() => handleViewDetails(student.userId)}
@@ -934,6 +991,18 @@ export const AdminStudentsTab: React.FC<AdminStudentsTabProps> = ({ batches }) =
                 <History className="w-3.5 h-3.5" />
                 <span>Activity Log</span>
               </button>
+
+              <button
+                onClick={() => setDetailTab('qr')}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                  detailTab === 'qr'
+                    ? 'bg-[#00b4d8] text-slate-950 shadow-sm font-black'
+                    : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>QR Identity</span>
+              </button>
             </div>
 
             {/* Subtab content */}
@@ -1098,6 +1167,68 @@ export const AdminStudentsTab: React.FC<AdminStudentsTabProps> = ({ batches }) =
                       </div>
                     ))
                   )}
+                </div>
+              )}
+
+              {detailTab === 'qr' && (
+                <div className="space-y-5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 text-center">
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/60 border border-cyan-800/40 text-[#00c2ff] text-xs font-bold">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Individual Student QR Token</span>
+                    </div>
+                    <h4 className="text-sm font-black text-slate-900 dark:text-white pt-1">
+                      {viewingDetail.profile.name} ({viewingDetail.profile.studentIdNumber})
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                      Assigned to cohort: <span className="font-semibold text-slate-700 dark:text-slate-300">{viewingDetail.profile.batchName}</span>
+                    </p>
+                  </div>
+
+                  {/* QR Code Graphic Frame */}
+                  <div className="w-52 h-52 mx-auto bg-white p-3 rounded-2xl shadow-xl flex items-center justify-center">
+                    <QRCodeSVG
+                      value={viewingDetail.profile.qrToken || viewingDetail.profile.studentIdNumber}
+                      size={180}
+                      level="H"
+                      includeMargin={false}
+                      bgColor="#ffffff"
+                      fgColor="#090c12"
+                    />
+                  </div>
+
+                  {/* Metadata and security token */}
+                  <div className="max-w-md mx-auto p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/60 text-left space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-medium">QR Status:</span>
+                      <span className="inline-flex items-center gap-1 font-bold text-emerald-500">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        {viewingDetail.profile.qrStatus || 'ACTIVE'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between font-mono">
+                      <span className="text-slate-400 font-sans">Token String:</span>
+                      <span className="text-[#00c2ff] font-bold truncate max-w-[200px]" title={viewingDetail.profile.qrToken}>
+                        {viewingDetail.profile.qrToken || viewingDetail.profile.studentIdNumber}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Regenerate Action */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      disabled={regeneratingQr || !viewingDetail.profile.studentId}
+                      onClick={() => handleRegenerateQr(viewingDetail.profile.studentId!)}
+                      className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-black transition-all shadow-sm flex items-center gap-2 mx-auto"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${regeneratingQr ? 'animate-spin' : ''}`} />
+                      <span>{regeneratingQr ? 'Regenerating Token...' : 'Regenerate Student QR Token'}</span>
+                    </button>
+                    <p className="text-[10px] text-slate-400 mt-2">
+                      Regenerating immediately revokes any previously printed or cached QR code for this student.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

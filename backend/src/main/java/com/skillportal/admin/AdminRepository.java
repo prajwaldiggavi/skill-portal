@@ -133,7 +133,7 @@ public class AdminRepository {
     public List<AdminDto.StudentAdminItem> listStudents(int offset, int limit, String search, Long batchId, Long courseId, String status) {
         StringBuilder sql = new StringBuilder(
                 "SELECT u.id AS user_id, st.id AS student_id, u.full_name, u.email, u.status, u.created_at, " +
-                "st.student_id_number, st.phone, st.college, st.total_points, " +
+                "st.student_id_number, st.phone, st.college, st.total_points, st.qr_token, st.qr_status, " +
                 "b.id AS batch_id, b.name AS batch_name, c.id AS course_id, c.title AS course_title, " +
                 "(SELECT COUNT(DISTINCT cs.problem_id) FROM coding_submissions cs WHERE cs.user_id = u.id AND cs.status = 'ACCEPTED') AS solved_problems, " +
                 "(SELECT AVG(percentage) FROM test_attempts ta WHERE ta.user_id = u.id AND ta.status IN ('SUBMITTED', 'AUTO_SUBMITTED', 'EVALUATED')) AS avg_test, " +
@@ -196,6 +196,8 @@ public class AdminRepository {
             double testScore = rs.getDouble("avg_test");
             s.setTestPerformance(rs.wasNull() ? 75.0 : Math.round(testScore * 10.0) / 10.0);
             s.setAssignmentProgress(80.0);
+            s.setQrToken(rs.getString("qr_token"));
+            s.setQrStatus(rs.getString("qr_status"));
             s.setCreatedAt(rs.getTimestamp("created_at").toInstant().toString());
             return s;
         }, params.toArray());
@@ -203,7 +205,7 @@ public class AdminRepository {
 
     public AdminDto.StudentDetailResponse getStudentDetail(Long userId) {
         String profileSql = "SELECT u.id AS user_id, st.id AS student_id, u.full_name, u.email, u.status, u.created_at, " +
-                            "st.student_id_number, st.phone, st.college, st.semester_or_year, st.avatar_url, st.total_points, " +
+                            "st.student_id_number, st.phone, st.college, st.semester_or_year, st.avatar_url, st.total_points, st.qr_token, st.qr_status, " +
                             "b.id AS batch_id, b.name AS batch_name, c.id AS course_id, c.title AS course_title " +
                             "FROM students st " +
                             "JOIN users u ON st.user_id = u.id " +
@@ -228,6 +230,8 @@ public class AdminRepository {
                 s.setCourseId(rs.getLong("course_id"));
                 s.setCourseTitle(rs.getString("course_title"));
                 s.setPoints(rs.getInt("total_points"));
+                s.setQrToken(rs.getString("qr_token"));
+                s.setQrStatus(rs.getString("qr_status"));
                 s.setCreatedAt(rs.getTimestamp("created_at").toInstant().toString());
                 return s;
             }
@@ -352,12 +356,13 @@ public class AdminRepository {
 
         Long userId = Objects.requireNonNull(userKeyHolder.getKey()).longValue();
 
-        // 2. Insert into students
+        // 2. Insert into students with unique QR identity token
+        String qrToken = "QR-" + java.util.UUID.randomUUID().toString().replace("-", "").toUpperCase();
         KeyHolder studentKeyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(
-                    "INSERT INTO students (user_id, student_id_number, phone, college, semester_or_year, batch_id, avatar_url, total_points) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
+                    "INSERT INTO students (user_id, student_id_number, phone, college, semester_or_year, batch_id, avatar_url, total_points, qr_token, qr_status, qr_generated_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVE', CURRENT_TIMESTAMP)",
                     Statement.RETURN_GENERATED_KEYS);
             ps.setLong(1, userId);
             ps.setString(2, req.getStudentCode().trim());
@@ -366,6 +371,7 @@ public class AdminRepository {
             ps.setString(5, req.getSemesterOrYear());
             if (req.getBatchId() != null) ps.setLong(6, req.getBatchId()); else ps.setNull(6, java.sql.Types.BIGINT);
             ps.setString(7, req.getAvatarUrl());
+            ps.setString(8, qrToken);
             return ps;
         }, studentKeyHolder);
 

@@ -6,15 +6,19 @@ import {
   Clock,
   BookOpen,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  QrCode
 } from 'lucide-react';
 import api from '../api/client';
 import { AttendanceData } from '../types';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { AttendanceCalendar } from '../components/attendance/AttendanceCalendar';
+import { StudentQrModal } from '../components/attendance/StudentQrModal';
 
 export const AttendancePage: React.FC = () => {
   const [data, setData] = useState<AttendanceData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   useEffect(() => {
     api.get('/attendance')
@@ -28,14 +32,24 @@ export const AttendancePage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-          <CalendarCheck className="w-6 h-6 text-[#00c2ff]" />
-          Classroom Attendance & Session History
-        </h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Monitor your batch lecture attendance percentage and classroom verification logs.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+            <CalendarCheck className="w-6 h-6 text-[#00c2ff]" />
+            Classroom Attendance & Session History
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Monitor your batch lecture attendance percentage, verified sessions, and instant QR identity.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowQrModal(true)}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#00b4d8] to-[#0096c7] hover:from-[#00c2ff] hover:to-[#00b4d8] text-slate-950 text-xs font-black transition-all shadow-lg shadow-cyan-500/20 shrink-0"
+        >
+          <QrCode className="w-4 h-4" />
+          <span>My Attendance QR Code</span>
+        </button>
       </div>
 
       {/* Summary Metric Cards */}
@@ -72,6 +86,9 @@ export const AttendancePage: React.FC = () => {
           <span className="text-[11px] text-slate-400 font-medium">Missed Sessions</span>
         </div>
       </div>
+
+      {/* Interactive Monthly Attendance Calendar */}
+      <AttendanceCalendar />
 
       {/* Subject-Wise Attendance Breakdown */}
       <div className="p-6 rounded-2xl bg-[#0c0e12] border border-[#1f2430] shadow-xl space-y-4">
@@ -152,6 +169,9 @@ export const AttendancePage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Student QR Identity Modal */}
+      <StudentQrModal isOpen={showQrModal} onClose={() => setShowQrModal(false)} />
     </div>
   );
 };

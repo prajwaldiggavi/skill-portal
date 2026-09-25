@@ -13,11 +13,13 @@ import {
   AlertCircle,
   ExternalLink,
   Code2,
-  BookOpen
+  BookOpen,
+  QrCode
 } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { StudentQrModal } from '../components/attendance/StudentQrModal';
 
 interface LeaderboardItem {
   rank: number;
@@ -50,6 +52,7 @@ export const DashboardPage: React.FC = () => {
 
   const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
   const [heroSlide, setHeroSlide] = useState(0);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   // Leaderboard data matching reference
   const topStudents: LeaderboardItem[] = [
@@ -261,6 +264,44 @@ export const DashboardPage: React.FC = () => {
               }`}
             />
           ))}
+        </div>
+      </div>
+
+      {/* Classroom QR Attendance Quick Access Strip */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#0d131f] via-[#101826] to-[#0d131f] border border-[#1d273a] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-cyan-950/20">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-cyan-950/80 border border-cyan-800/60 flex items-center justify-center text-[#00c2ff] shrink-0 shadow-md shadow-cyan-950/40">
+            <QrCode className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs sm:text-sm font-black text-white">
+                Classroom Attendance QR
+              </h4>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 text-[10px] font-bold border border-emerald-800/50">
+                Verified System
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Present your unique, encrypted student QR identity to the instructor scanner for rapid check-in.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Link
+            to="/attendance"
+            className="px-3.5 py-2 rounded-xl bg-[#141a27] hover:bg-[#1a2334] text-slate-300 hover:text-white text-xs font-bold transition-all border border-[#222c3f]"
+          >
+            Monthly Calendar
+          </Link>
+          <button
+            onClick={() => setShowQrModal(true)}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#00b4d8] to-[#0096c7] hover:from-[#00c2ff] hover:to-[#00b4d8] text-slate-950 text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-cyan-500/20"
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            <span>Show My QR</span>
+          </button>
         </div>
       </div>
 
@@ -618,6 +659,9 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Official Student QR Identity Modal */}
+      <StudentQrModal isOpen={showQrModal} onClose={() => setShowQrModal(false)} />
     </div>
   );
 };

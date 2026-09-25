@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   CalendarCheck,
   Plus,
@@ -14,7 +15,10 @@ import {
   AlertTriangle,
   UserCheck,
   Calendar,
-  Sparkles
+  Sparkles,
+  QrCode,
+  ScanLine,
+  ChevronRight
 } from 'lucide-react';
 import api from '../../api/client';
 import {
@@ -22,7 +26,8 @@ import {
   StudentAttendanceMarkItem,
   AttendanceSessionCreateRequest,
   AttendanceMarkRequest,
-  BatchItem
+  BatchItem,
+  TodayScanItem
 } from '../../types';
 
 interface AdminAttendanceTabProps {
@@ -56,6 +61,22 @@ export const AdminAttendanceTab: React.FC<AdminAttendanceTabProps> = ({ batches 
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Today's QR Scans Feed
+  const [todayScans, setTodayScans] = useState<TodayScanItem[]>([]);
+  const [loadingScans, setLoadingScans] = useState(false);
+
+  const fetchTodayScans = async () => {
+    setLoadingScans(true);
+    try {
+      const res = await api.get('/attendance/scans/today');
+      setTodayScans(res.data?.data || []);
+    } catch (err) {
+      console.error('Failed to load today scans', err);
+    } finally {
+      setLoadingScans(false);
+    }
+  };
+
   const fetchSessions = async () => {
     setLoading(true);
     setError(null);
@@ -74,6 +95,7 @@ export const AdminAttendanceTab: React.FC<AdminAttendanceTabProps> = ({ batches 
 
   useEffect(() => {
     fetchSessions();
+    fetchTodayScans();
   }, [selectedBatch]);
 
   const showNotification = (msg: string) => {
@@ -207,12 +229,22 @@ export const AdminAttendanceTab: React.FC<AdminAttendanceTabProps> = ({ batches 
           </div>
 
           <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => fetchSessions()}
-              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
-              title="Refresh Sessions"
+            <Link
+              to="/admin/scanner"
+              className="px-4 py-2.5 bg-gradient-to-r from-[#00b4d8] to-[#0096c7] hover:from-[#00c2ff] hover:to-[#00b4d8] text-slate-950 rounded-xl text-xs font-black transition-all shadow-md shadow-cyan-500/20 flex items-center gap-2 shrink-0"
             >
-              <RefreshCw className="w-4 h-4" />
+              <ScanLine className="w-4 h-4" />
+              <span>Launch QR Scanner</span>
+            </Link>
+            <button
+              onClick={() => {
+                fetchSessions();
+                fetchTodayScans();
+              }}
+              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+              title="Refresh Sessions & Scans"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingScans ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={() => {
@@ -243,6 +275,79 @@ export const AdminAttendanceTab: React.FC<AdminAttendanceTabProps> = ({ batches 
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Today's Live QR Check-Ins Widget */}
+      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ScanLine className="w-4 h-4 text-[#00b4d8]" />
+            <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+              Today's Live QR Check-Ins
+            </h3>
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 text-[10px] font-black border border-emerald-200 dark:border-emerald-800/60">
+              {todayScans.length} Scans Today
+            </span>
+          </div>
+
+          <Link
+            to="/admin/scanner"
+            className="text-xs font-bold text-brand-600 hover:text-brand-700 dark:text-sky-400 flex items-center gap-1 transition-colors"
+          >
+            <span>Open Mobile Scanner</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {todayScans.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-400">
+            No QR check-ins recorded today yet. Launch the QR Scanner to begin scanning student badges.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                  <th className="pb-2.5 font-bold">Student Name</th>
+                  <th className="pb-2.5 font-bold">Roll / ID</th>
+                  <th className="pb-2.5 font-bold">Cohort</th>
+                  <th className="pb-2.5 font-bold">Time</th>
+                  <th className="pb-2.5 font-bold">Source</th>
+                  <th className="pb-2.5 font-bold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                {todayScans.slice(0, 5).map((scan) => (
+                  <tr key={scan.recordId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-2.5 font-bold text-slate-900 dark:text-white">
+                      {scan.studentName}
+                    </td>
+                    <td className="py-2.5 font-mono text-brand-600 dark:text-brand-400">
+                      {scan.studentIdNumber}
+                    </td>
+                    <td className="py-2.5 text-slate-600 dark:text-slate-300">
+                      {scan.batchName}
+                    </td>
+                    <td className="py-2.5 font-mono text-slate-500">
+                      {scan.scanTime}
+                    </td>
+                    <td className="py-2.5">
+                      <span className="px-2 py-0.5 rounded font-mono text-[10px] bg-cyan-50 dark:bg-cyan-950/50 text-[#0096c7] dark:text-[#00c2ff] border border-cyan-200 dark:border-cyan-800/50 font-bold">
+                        {scan.source}
+                      </span>
+                    </td>
+                    <td className="py-2.5">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {scan.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Sessions Grid / Table */}

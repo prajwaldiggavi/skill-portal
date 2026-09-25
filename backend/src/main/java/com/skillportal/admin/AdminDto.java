@@ -113,6 +113,14 @@ public class AdminDto {
         private double testPerformance;
         private int solvedProblems;
         private String createdAt;
+        private String qrToken;
+        private String qrStatus;
+
+        public String getQrToken() { return qrToken; }
+        public void setQrToken(String qrToken) { this.qrToken = qrToken; }
+
+        public String getQrStatus() { return qrStatus; }
+        public void setQrStatus(String qrStatus) { this.qrStatus = qrStatus; }
 
         public Long getUserId() { return userId; }
         public void setUserId(Long userId) { this.userId = userId; }

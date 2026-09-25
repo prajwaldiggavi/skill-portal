@@ -18,10 +18,12 @@ import {
   Moon,
   LogOut,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  ScanLine
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { StudentQrModal } from '../attendance/StudentQrModal';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -46,17 +48,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onCloseMobile }) => {
     { to: '/assignments', label: 'Assignments', icon: FileText },
     { to: '/company-questions', label: 'Company Questions', icon: Building2 },
     { to: '/jobs', label: 'Jobs', icon: Briefcase },
+    { to: '/attendance', label: 'Attendance', icon: QrCode },
     { to: '/bookmarks', label: 'Bookmarks', icon: Bookmark },
     { to: '/coding', label: 'Ask TAI', icon: Bot },
     { to: '/profile', label: 'Profile', icon: User },
   ];
 
   if (user?.role === 'ROLE_ADMIN') {
-    navItems.push({
-      to: '/admin',
-      label: 'Admin Console',
-      icon: ShieldCheck,
-    });
+    navItems.push(
+      {
+        to: '/admin',
+        label: 'Admin Console',
+        icon: ShieldCheck,
+      },
+      {
+        to: '/admin/scanner',
+        label: 'QR Scanner',
+        icon: ScanLine,
+      }
+    );
   }
 
   const handleLogout = async () => {
@@ -129,15 +139,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onCloseMobile }) => {
             </div>
           </div>
 
-          {/* Scan QR Code Item */}
+          {/* Quick QR Code / Scanner Action */}
           <div className="px-3 py-1">
-            <button
-              onClick={() => setShowQrModal(true)}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-[#14171f] rounded-lg transition-all text-left"
-            >
-              <QrCode className="w-4 h-4 text-slate-400" />
-              <span>Scan QR Code</span>
-            </button>
+            {user?.role === 'ROLE_ADMIN' ? (
+              <NavLink
+                to="/admin/scanner"
+                onClick={onCloseMobile}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[#00c2ff] hover:text-white bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-800/40 rounded-xl transition-all text-left shadow-sm"
+              >
+                <ScanLine className="w-4 h-4 text-[#00c2ff]" />
+                <span className="font-bold">Admin Scanner</span>
+              </NavLink>
+            ) : (
+              <button
+                onClick={() => setShowQrModal(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-[#14171f] rounded-xl transition-all text-left"
+              >
+                <QrCode className="w-4 h-4 text-[#00c2ff]" />
+                <span>My Attendance QR</span>
+              </button>
+            )}
           </div>
 
           {/* MENU Category Label */}
@@ -254,35 +275,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onCloseMobile }) => {
         </div>
       </aside>
 
-      {/* QR Code Scan Modal */}
-      {showQrModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-[#12151c] border border-[#1f2430] rounded-2xl max-w-sm w-full p-6 text-center space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center justify-center gap-2">
-              <QrCode className="w-4 h-4 text-[#00c2ff]" />
-              <span>Scan QR Code</span>
-            </h3>
-            <div className="w-48 h-48 mx-auto bg-white p-3 rounded-xl flex items-center justify-center">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                  window.location.origin
-                )}`}
-                alt="Skill Portal QR"
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <p className="text-xs text-slate-400">
-              Scan with your mobile camera to quickly log in or sync your learning streak.
-            </p>
-            <button
-              onClick={() => setShowQrModal(false)}
-              className="w-full py-2 bg-[#1e2330] hover:bg-[#2a3142] text-white rounded-xl text-xs font-bold transition-all"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Official Student QR Identity Modal */}
+      <StudentQrModal isOpen={showQrModal} onClose={() => setShowQrModal(false)} />
     </>
   );
 };

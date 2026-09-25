@@ -21,6 +21,7 @@ const MaterialsPage = lazy(() => import('./pages/MaterialsPage').then(m => ({ de
 const BookmarksPage = lazy(() => import('./pages/BookmarksPage').then(m => ({ default: m.BookmarksPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
+const AdminScannerPage = lazy(() => import('./pages/AdminScannerPage').then(m => ({ default: m.AdminScannerPage })));
 const CompanyQuestionsPage = lazy(() => import('./pages/CompanyQuestionsPage').then(m => ({ default: m.CompanyQuestionsPage })));
 const JobsPage = lazy(() => import('./pages/JobsPage').then(m => ({ default: m.JobsPage })));
 
@@ -86,6 +87,14 @@ export const App: React.FC = () => {
                   element={
                     <ProtectedRoute adminOnly>
                       <AdminDashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/scanner"
+                  element={
+                    <ProtectedRoute adminOnly>
+                      <AdminScannerPage />
                     </ProtectedRoute>
                   }
                 />

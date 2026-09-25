@@ -31,6 +31,56 @@ public class AttendanceController {
         return ResponseEntity.ok(ApiResponse.success(summary));
     }
 
+    @GetMapping("/my-qr")
+    @Operation(summary = "Student: Get personalized unique attendance QR code identity")
+    public ResponseEntity<ApiResponse<AttendanceDto.MyQrCodeResponse>> getMyQrCode(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        AttendanceDto.MyQrCodeResponse response = attendanceService.getMyQrCode(principal.getId());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/qr/scan")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin: Process and verify student QR scan for live attendance")
+    public ResponseEntity<ApiResponse<AttendanceDto.QrScanResponse>> scanStudentQr(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody AttendanceDto.QrScanRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
+        String clientIp = httpRequest.getHeader("X-Forwarded-For");
+        if (clientIp == null || clientIp.isEmpty()) {
+            clientIp = httpRequest.getRemoteAddr();
+        }
+        AttendanceDto.QrScanResponse response = attendanceService.processQrScan(principal.getId(), request, clientIp);
+        return ResponseEntity.ok(ApiResponse.success(response.getMessage(), response));
+    }
+
+    @GetMapping("/calendar")
+    @Operation(summary = "Student: Get monthly date-by-date attendance calendar visualization")
+    public ResponseEntity<ApiResponse<AttendanceDto.CalendarAttendanceResponse>> getCalendar(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+        AttendanceDto.CalendarAttendanceResponse response = attendanceService.getCalendarAttendance(principal.getId(), year, month);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/scans/today")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin: List all verified QR attendance scans conducted today")
+    public ResponseEntity<ApiResponse<List<AttendanceDto.TodayScanItem>>> getTodayScans() {
+        List<AttendanceDto.TodayScanItem> list = attendanceService.getTodayScans();
+        return ResponseEntity.ok(ApiResponse.success(list));
+    }
+
+    @PostMapping("/students/{studentId}/regenerate-qr")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin: Revoke and regenerate a student's QR identity token")
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> regenerateQr(
+            @PathVariable Long studentId) {
+        String newToken = attendanceService.regenerateStudentQr(studentId);
+        return ResponseEntity.ok(ApiResponse.success("Student QR code regenerated successfully", java.util.Map.of("qrToken", newToken)));
+    }
+
     @PostMapping("/sessions")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Admin: Create a new attendance session")

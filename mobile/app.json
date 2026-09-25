@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Skill Portal Scanner",
+    "slug": "skill-portal-admin-scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0c0e12"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Skill Portal Scanner needs camera access to scan student QR codes for classroom attendance."
+      },
+      "bundleIdentifier": "com.skillportal.adminscanner"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0c0e12"
+      },
+      "package": "com.skillportal.adminscanner",
+      "permissions": [
+        "CAMERA"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Skill Portal to scan student attendance QR codes."
+        }
+      ]
+    ]
+  }
+}

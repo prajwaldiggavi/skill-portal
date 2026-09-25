@@ -543,6 +543,8 @@ export interface StudentAdminItem {
   assignmentProgress?: number;
   testPerformance?: number;
   solvedProblems?: number;
+  qrToken?: string;
+  qrStatus?: string;
   createdAt: string;
 }
 
@@ -936,5 +938,78 @@ export interface AnnouncementCreateRequest {
   type?: string;
   targetBatchId?: number;
   linkUrl?: string;
+}
+
+export interface MyQrCodeResponse {
+  studentId: number;
+  studentIdNumber: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  college: string;
+  batchId: number;
+  batchName: string;
+  courseTitle: string;
+  qrToken: string;
+  qrStatus: string;
+  qrGeneratedAt: string;
+}
+
+export interface QrScanRequest {
+  qrToken: string;
+  sessionId?: number;
+  deviceInfo?: string;
+}
+
+export interface QrScanResponse {
+  attendanceStatus: 'PRESENT' | 'ALREADY_MARKED' | 'INVALID_QR' | 'INACTIVE_STUDENT' | 'REVOKED';
+  message: string;
+  student?: {
+    id: number;
+    studentIdNumber: string;
+    fullName: string;
+    email: string;
+    batchName: string;
+    avatarUrl?: string;
+  };
+  attendanceDate?: string;
+  attendanceTime?: string;
+  sessionId?: number;
+  sessionTitle?: string;
+  source?: string;
+  markedAt?: string;
+  existingMarkedAt?: string;
+}
+
+export interface CalendarDayStat {
+  date: string;
+  dayOfWeek: string;
+  status: 'PRESENT' | 'ABSENT' | 'NO_SESSION';
+  sessionTitle?: string;
+  markedAt?: string;
+  source?: 'QR_SCAN' | 'MANUAL';
+}
+
+export interface CalendarAttendanceResponse {
+  year: number;
+  month: number;
+  totalSessions: number;
+  presentCount: number;
+  absentCount: number;
+  attendancePercentage: number;
+  days: CalendarDayStat[];
+}
+
+export interface TodayScanItem {
+  recordId: number;
+  studentId: number;
+  studentIdNumber: string;
+  studentName: string;
+  batchName: string;
+  status: string;
+  scanTime: string;
+  markedByAdminName: string;
+  source: string;
+  remarks?: string;
 }
 
