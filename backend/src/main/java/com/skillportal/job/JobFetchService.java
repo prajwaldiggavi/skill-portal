@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +52,22 @@ public class JobFetchService {
         this.appKey = appKey != null ? appKey.trim() : "";
         this.baseUrl = baseUrl != null ? baseUrl.trim() : "https://api.adzuna.com/v1/api/jobs/in/search";
         this.restClient = RestClient.builder().build();
+    }
+
+    /**
+     * Initial startup check: If jobs table is empty, trigger an initial fetch so students have live data immediately
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationReady() {
+        try {
+            if (jobRepository.count() == 0) {
+                log.info("Jobs table is currently empty. Running initial Adzuna job fetch...");
+                int added = fetchAndSaveJobs();
+                log.info("Initial Adzuna job fetch complete. {} jobs loaded.", added);
+            }
+        } catch (Exception e) {
+            log.warn("Initial Adzuna job fetch on startup encountered an issue (will retry on hourly cron): {}", e.getMessage());
+        }
     }
 
     /**

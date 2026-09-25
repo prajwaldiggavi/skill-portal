@@ -29,8 +29,8 @@ spring:
     show-sql: false
 
 adzuna:
-  app-id: ${ADZUNA_APP_ID:}
-  app-key: ${ADZUNA_APP_KEY:}
+  app-id: ${ADZUNA_APP_ID:c6058c3a}
+  app-key: ${ADZUNA_APP_KEY:94b0098325a92b0b46deb65be5652787}
   base-url: ${ADZUNA_BASE_URL:https://api.adzuna.com/v1/api/jobs/in/search}
 
 jwt:
