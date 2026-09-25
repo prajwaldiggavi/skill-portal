@@ -5,7 +5,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -27,12 +30,148 @@ public class AssignmentRepository {
             a.setDifficulty(rs.getString("difficulty"));
             a.setTotalMarks(rs.getInt("total_marks"));
             a.setTimeLimitMinutes(rs.getInt("time_limit_minutes"));
+            a.setStatus("NOT_STARTED");
             return a;
         });
 
-        for (AssignmentDto.AssignmentSummary a : list) {
-            populateAssignmentStats(a, userId);
+        if (list.isEmpty()) {
+            return list;
         }
+
+        // 1. Batch load all sections for all published assignments
+        String secSql = "SELECT s.id, s.assignment_id, s.section_number, s.title, s.description " +
+                        "FROM assignment_sections s " +
+                        "JOIN assignments a ON s.assignment_id = a.id " +
+                        "WHERE a.is_published = TRUE AND a.is_deleted = FALSE " +
+                        "ORDER BY s.assignment_id ASC, s.section_number ASC";
+
+        List<AssignmentDto.SectionSummary> allSections = jdbcTemplate.query(secSql, (rs, rowNum) -> {
+            AssignmentDto.SectionSummary s = new AssignmentDto.SectionSummary();
+            s.setId(rs.getLong("id"));
+            s.setAssignmentId(rs.getLong("assignment_id"));
+            s.setSectionNumber(rs.getInt("section_number"));
+            s.setTitle(rs.getString("title"));
+            s.setDescription(rs.getString("description"));
+            return s;
+        });
+
+        // 2. Batch load all questions & attempt statuses across all sections
+        String qSql;
+        Object[] qParams;
+        if (userId != null) {
+            qSql = "SELECT aq.section_id, s.assignment_id, q.id AS question_id, q.marks, " +
+                   "qa.status AS attempt_status, qa.marks_obtained " +
+                   "FROM assignment_questions aq " +
+                   "JOIN questions q ON aq.question_id = q.id " +
+                   "JOIN assignment_sections s ON aq.section_id = s.id " +
+                   "JOIN assignments a ON s.assignment_id = a.id " +
+                   "LEFT JOIN (" +
+                   "    SELECT qa1.question_id, qa1.status, qa1.marks_obtained " +
+                   "    FROM question_attempts qa1 " +
+                   "    INNER JOIN (" +
+                   "        SELECT question_id, MAX(id) AS max_id " +
+                   "        FROM question_attempts " +
+                   "        WHERE user_id = ? " +
+                   "        GROUP BY question_id " +
+                   "    ) qa2 ON qa1.id = qa2.max_id " +
+                   ") qa ON q.id = qa.question_id " +
+                   "WHERE a.is_published = TRUE AND a.is_deleted = FALSE " +
+                   "ORDER BY s.assignment_id ASC, s.section_number ASC, aq.order_index ASC";
+            qParams = new Object[]{userId};
+        } else {
+            qSql = "SELECT aq.section_id, s.assignment_id, q.id AS question_id, q.marks, " +
+                   "'NOT_ATTEMPTED' AS attempt_status, 0 AS marks_obtained " +
+                   "FROM assignment_questions aq " +
+                   "JOIN questions q ON aq.question_id = q.id " +
+                   "JOIN assignment_sections s ON aq.section_id = s.id " +
+                   "JOIN assignments a ON s.assignment_id = a.id " +
+                   "WHERE a.is_published = TRUE AND a.is_deleted = FALSE " +
+                   "ORDER BY s.assignment_id ASC, s.section_number ASC, aq.order_index ASC";
+            qParams = new Object[]{};
+        }
+
+        // Section stats aggregation container
+        class SectionStat {
+            int qCount = 0;
+            int solvedCount = 0;
+            int marksObtained = 0;
+        }
+
+        Map<Long, SectionStat> statsBySectionId = new HashMap<>();
+        jdbcTemplate.query(qSql, rs -> {
+            Long secId = rs.getLong("section_id");
+            SectionStat stat = statsBySectionId.computeIfAbsent(secId, k -> new SectionStat());
+            stat.qCount++;
+            String status = rs.getString("attempt_status");
+            if ("SOLVED".equalsIgnoreCase(status)) {
+                stat.solvedCount++;
+                stat.marksObtained += rs.getInt("marks_obtained");
+            }
+        }, qParams);
+
+        // Group sections by assignment_id
+        Map<Long, List<AssignmentDto.SectionSummary>> sectionsByAssignmentId = new HashMap<>();
+        for (AssignmentDto.SectionSummary s : allSections) {
+            SectionStat stat = statsBySectionId.getOrDefault(s.getId(), new SectionStat());
+            s.setQuestionCount(stat.qCount);
+            s.setSolvedCount(stat.solvedCount);
+            s.setMarksObtained(stat.marksObtained);
+            sectionsByAssignmentId.computeIfAbsent(s.getAssignmentId(), k -> new ArrayList<>()).add(s);
+        }
+
+        // Aggregate statistics per assignment
+        for (AssignmentDto.AssignmentSummary a : list) {
+            List<AssignmentDto.SectionSummary> sections = sectionsByAssignmentId.getOrDefault(a.getId(), Collections.emptyList());
+            a.setTotalSections(sections.size());
+
+            int completedSec = 0;
+            int totalQ = 0;
+            int solvedQ = 0;
+            int marksObtained = 0;
+            boolean previousSectionCompleted = true;
+
+            for (AssignmentDto.SectionSummary s : sections) {
+                if (!previousSectionCompleted) {
+                    s.setLocked(true);
+                    s.setStatus("LOCKED");
+                } else {
+                    s.setLocked(false);
+                    if (s.getSolvedCount() == s.getQuestionCount() && s.getQuestionCount() > 0) {
+                        s.setStatus("COMPLETED");
+                    } else if (s.getSolvedCount() > 0) {
+                        s.setStatus("IN_PROGRESS");
+                    } else {
+                        s.setStatus("AVAILABLE");
+                    }
+                }
+
+                if ("COMPLETED".equals(s.getStatus())) {
+                    completedSec++;
+                }
+                totalQ += s.getQuestionCount();
+                solvedQ += s.getSolvedCount();
+                marksObtained += s.getMarksObtained();
+
+                previousSectionCompleted = "COMPLETED".equals(s.getStatus());
+            }
+
+            a.setCompletedSections(completedSec);
+            a.setTotalQuestions(totalQ);
+            a.setSolvedQuestions(solvedQ);
+            a.setMarksObtained(marksObtained);
+
+            double pct = a.getTotalMarks() > 0 ? ((double) marksObtained / a.getTotalMarks()) * 100.0 : 0.0;
+            a.setPercentage(Math.round(pct * 10.0) / 10.0);
+
+            if (solvedQ == totalQ && totalQ > 0) {
+                a.setStatus("COMPLETED");
+            } else if (solvedQ > 0) {
+                a.setStatus("IN_PROGRESS");
+            } else {
+                a.setStatus("NOT_STARTED");
+            }
+        }
+
         return list;
     }
 
@@ -76,13 +215,86 @@ public class AssignmentRepository {
             s.setSectionNumber(rs.getInt("section_number"));
             s.setTitle(rs.getString("title"));
             s.setDescription(rs.getString("description"));
+            s.setQuestions(new ArrayList<>());
             return s;
         }, assignmentId);
+
+        if (sections.isEmpty()) {
+            return sections;
+        }
+
+        // Batch load all questions across all sections of this assignment in a single query
+        String qSql;
+        Object[] qParams;
+        if (userId != null) {
+            qSql = "SELECT aq.section_id, q.id, q.title, q.question_type, q.difficulty, q.marks, " +
+                   "qa.status AS attempt_status, qa.marks_obtained, " +
+                   "(CASE WHEN bm.id IS NOT NULL THEN 1 ELSE 0 END) AS is_bm " +
+                   "FROM assignment_questions aq " +
+                   "JOIN questions q ON aq.question_id = q.id " +
+                   "JOIN assignment_sections s ON aq.section_id = s.id " +
+                   "LEFT JOIN (" +
+                   "    SELECT qa1.question_id, qa1.status, qa1.marks_obtained " +
+                   "    FROM question_attempts qa1 " +
+                   "    INNER JOIN (" +
+                   "        SELECT question_id, MAX(id) AS max_id " +
+                   "        FROM question_attempts " +
+                   "        WHERE user_id = ? " +
+                   "        GROUP BY question_id " +
+                   "    ) qa2 ON qa1.id = qa2.max_id " +
+                   ") qa ON q.id = qa.question_id " +
+                   "LEFT JOIN bookmarks bm ON bm.user_id = ? AND bm.target_type = 'QUESTION' AND bm.target_id = q.id " +
+                   "WHERE s.assignment_id = ? " +
+                   "ORDER BY s.section_number ASC, aq.order_index ASC";
+            qParams = new Object[]{userId, userId, assignmentId};
+        } else {
+            qSql = "SELECT aq.section_id, q.id, q.title, q.question_type, q.difficulty, q.marks, " +
+                   "'NOT_ATTEMPTED' AS attempt_status, 0 AS marks_obtained, 0 AS is_bm " +
+                   "FROM assignment_questions aq " +
+                   "JOIN questions q ON aq.question_id = q.id " +
+                   "JOIN assignment_sections s ON aq.section_id = s.id " +
+                   "WHERE s.assignment_id = ? " +
+                   "ORDER BY s.section_number ASC, aq.order_index ASC";
+            qParams = new Object[]{assignmentId};
+        }
+
+        Map<Long, List<AssignmentDto.QuestionSummary>> questionsBySectionId = new HashMap<>();
+        jdbcTemplate.query(qSql, rs -> {
+            AssignmentDto.QuestionSummary q = new AssignmentDto.QuestionSummary();
+            q.setId(rs.getLong("id"));
+            q.setTitle(rs.getString("title"));
+            q.setQuestionType(rs.getString("question_type"));
+            q.setDifficulty(rs.getString("difficulty"));
+            q.setMarks(rs.getInt("marks"));
+            String attStatus = rs.getString("attempt_status");
+            q.setStatus(attStatus != null ? attStatus : "NOT_ATTEMPTED");
+            q.setMarksObtained(rs.getInt("marks_obtained"));
+            q.setBookmarked(rs.getInt("is_bm") > 0);
+
+            Long secId = rs.getLong("section_id");
+            questionsBySectionId.computeIfAbsent(secId, k -> new ArrayList<>()).add(q);
+        }, qParams);
 
         boolean previousSectionCompleted = true; // Section 1 is always unlocked
 
         for (AssignmentDto.SectionSummary s : sections) {
-            populateSectionQuestionsAndStats(s, userId);
+            List<AssignmentDto.QuestionSummary> questions = questionsBySectionId.getOrDefault(s.getId(), Collections.emptyList());
+            s.setQuestions(questions);
+            s.setQuestionCount(questions.size());
+
+            int solved = 0;
+            int marksObtained = 0;
+            int totalMarks = 0;
+            for (AssignmentDto.QuestionSummary q : questions) {
+                totalMarks += q.getMarks();
+                if ("SOLVED".equals(q.getStatus())) {
+                    solved++;
+                    marksObtained += q.getMarksObtained();
+                }
+            }
+            s.setSolvedCount(solved);
+            s.setTotalMarks(totalMarks);
+            s.setMarksObtained(marksObtained);
 
             // Sequential unlocking rule (Requirement 15):
             if (!previousSectionCompleted) {
@@ -99,7 +311,6 @@ public class AssignmentRepository {
                 }
             }
 
-            // A section is considered completed if all its questions are solved
             previousSectionCompleted = "COMPLETED".equals(s.getStatus());
         }
 
@@ -130,83 +341,6 @@ public class AssignmentRepository {
             return Optional.ofNullable(s);
         } catch (EmptyResultDataAccessException e) {
             return Optional.empty();
-        }
-    }
-
-    private void populateSectionQuestionsAndStats(AssignmentDto.SectionSummary s, Long userId) {
-        String qSql = "SELECT q.id, q.title, q.question_type, q.difficulty, q.marks, " +
-                      "(SELECT status FROM question_attempts qa WHERE qa.question_id = q.id AND qa.user_id = ? ORDER BY id DESC LIMIT 1) AS attempt_status, " +
-                      "(SELECT marks_obtained FROM question_attempts qa WHERE qa.question_id = q.id AND qa.user_id = ? ORDER BY id DESC LIMIT 1) AS marks_obtained, " +
-                      "(SELECT COUNT(*) FROM bookmarks bm WHERE bm.user_id = ? AND bm.target_type = 'QUESTION' AND bm.target_id = q.id) AS is_bm " +
-                      "FROM questions q " +
-                      "JOIN assignment_questions aq ON q.id = aq.question_id " +
-                      "WHERE aq.section_id = ? ORDER BY aq.order_index ASC";
-
-        List<AssignmentDto.QuestionSummary> questions = jdbcTemplate.query(qSql, (rs, rowNum) -> {
-            AssignmentDto.QuestionSummary q = new AssignmentDto.QuestionSummary();
-            q.setId(rs.getLong("id"));
-            q.setTitle(rs.getString("title"));
-            q.setQuestionType(rs.getString("question_type"));
-            q.setDifficulty(rs.getString("difficulty"));
-            q.setMarks(rs.getInt("marks"));
-
-            String attStatus = rs.getString("attempt_status");
-            q.setStatus(attStatus != null ? attStatus : "NOT_ATTEMPTED");
-            q.setMarksObtained(rs.getInt("marks_obtained"));
-            q.setBookmarked(rs.getInt("is_bm") > 0);
-            return q;
-        }, userId, userId, userId, s.getId());
-
-        s.setQuestions(questions);
-        s.setQuestionCount(questions.size());
-
-        int solved = 0;
-        int marksObtained = 0;
-        int totalMarks = 0;
-        for (AssignmentDto.QuestionSummary q : questions) {
-            totalMarks += q.getMarks();
-            if ("SOLVED".equals(q.getStatus())) {
-                solved++;
-                marksObtained += q.getMarksObtained();
-            }
-        }
-        s.setSolvedCount(solved);
-        s.setTotalMarks(totalMarks);
-        s.setMarksObtained(marksObtained);
-    }
-
-    private void populateAssignmentStats(AssignmentDto.AssignmentSummary a, Long userId) {
-        List<AssignmentDto.SectionSummary> sections = findSectionsByAssignmentId(a.getId(), userId);
-        a.setTotalSections(sections.size());
-
-        int completedSec = 0;
-        int totalQ = 0;
-        int solvedQ = 0;
-        int marksObtained = 0;
-
-        for (AssignmentDto.SectionSummary s : sections) {
-            if ("COMPLETED".equals(s.getStatus())) {
-                completedSec++;
-            }
-            totalQ += s.getQuestionCount();
-            solvedQ += s.getSolvedCount();
-            marksObtained += s.getMarksObtained();
-        }
-
-        a.setCompletedSections(completedSec);
-        a.setTotalQuestions(totalQ);
-        a.setSolvedQuestions(solvedQ);
-        a.setMarksObtained(marksObtained);
-
-        double pct = a.getTotalMarks() > 0 ? ((double) marksObtained / a.getTotalMarks()) * 100.0 : 0.0;
-        a.setPercentage(Math.round(pct * 10.0) / 10.0);
-
-        if (solvedQ == totalQ && totalQ > 0) {
-            a.setStatus("COMPLETED");
-        } else if (solvedQ > 0) {
-            a.setStatus("IN_PROGRESS");
-        } else {
-            a.setStatus("NOT_STARTED");
         }
     }
 }

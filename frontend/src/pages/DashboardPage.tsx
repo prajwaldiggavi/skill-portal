@@ -66,15 +66,12 @@ export const DashboardPage: React.FC = () => {
   ];
 
   useEffect(() => {
-    // Fetch live dashboard & personalized statistics
-    Promise.allSettled([
-      api.get('/student/dashboard'),
-      api.get('/dashboard')
-    ]).then(([resStudent, resDash]) => {
+    // Single consolidated fetch for live personalized dashboard & statistics
+    api.get('/student/dashboard').then((res) => {
       let map: Record<string, number> = {};
 
-      if (resStudent.status === 'fulfilled' && resStudent.value.data?.data) {
-        const sData = resStudent.value.data.data;
+      if (res.data?.data) {
+        const sData = res.data.data;
         const stats = sData.statistics || {};
         setStudentStats((prev) => ({
           ...prev,
@@ -82,29 +79,15 @@ export const DashboardPage: React.FC = () => {
           currentStreak: stats.currentStreak || prev.currentStreak,
           longestStreak: stats.longestStreak || prev.longestStreak,
           correctSubmissions: stats.problemsSolved || prev.correctSubmissions,
-          courseProgress: Math.round(stats.courseProgressPercentage || 1),
-          assignmentProgress: Math.round(stats.overallPercentage || 20),
-          testProgress: Math.round(stats.testAveragePercentage || 20),
+          courseProgress: Math.round(stats.courseProgressPercentage || stats.courseProgress || prev.courseProgress),
+          assignmentProgress: Math.round(stats.overallPercentage || prev.assignmentProgress),
+          testProgress: Math.round(stats.testAveragePercentage || prev.testProgress),
+          resumeTitle: sData.resumeLearning?.topicTitle || prev.resumeTitle,
+          resumeProgress: Math.round(sData.resumeLearning?.watchedPercentage || prev.resumeProgress),
         }));
 
         if (Array.isArray(sData.activityHeatmap)) {
           sData.activityHeatmap.forEach((item: { date: string; count: number }) => {
-            if (item && item.date) map[item.date] = item.count;
-          });
-        }
-      }
-
-      if (resDash.status === 'fulfilled' && resDash.value.data?.data) {
-        const dData = resDash.value.data.data;
-        if (dData.resumeLearning?.topicTitle) {
-          setStudentStats((prev) => ({
-            ...prev,
-            resumeTitle: dData.resumeLearning.topicTitle,
-            resumeProgress: Math.round(dData.resumeLearning.watchedPercentage || 88),
-          }));
-        }
-        if (Array.isArray(dData.heatmap) && Object.keys(map).length === 0) {
-          dData.heatmap.forEach((item: { date: string; count: number }) => {
             if (item && item.date) map[item.date] = item.count;
           });
         }

@@ -239,6 +239,7 @@ public class DashboardDto {
         private List<ModuleProgressItem> courseProgress;
         private List<ActivityHeatmapDay> activityHeatmap;
         private List<UpcomingItem> notifications;
+        private ResumeLearning resumeLearning;
 
         public StudentProfileInfo getStudent() { return student; }
         public void setStudent(StudentProfileInfo student) { this.student = student; }
@@ -272,6 +273,9 @@ public class DashboardDto {
 
         public List<UpcomingItem> getNotifications() { return notifications; }
         public void setNotifications(List<UpcomingItem> notifications) { this.notifications = notifications; }
+
+        public ResumeLearning getResumeLearning() { return resumeLearning; }
+        public void setResumeLearning(ResumeLearning resumeLearning) { this.resumeLearning = resumeLearning; }
     }
 
     public static class StudentProfileInfo {

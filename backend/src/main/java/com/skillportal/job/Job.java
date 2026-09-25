@@ -15,6 +15,9 @@ public class Job {
     @Column(name = "external_id", nullable = false, unique = true, length = 100)
     private String externalId;
 
+    @Column(name = "source_job_id", length = 100)
+    private String sourceJobId;
+
     @Column(name = "title", nullable = false, length = 255)
     private String title;
 
@@ -35,6 +38,18 @@ public class Job {
 
     @Column(name = "apply_url", nullable = false, length = 1000)
     private String applyUrl;
+
+    @Column(name = "original_url", length = 1000)
+    private String originalUrl;
+
+    @Column(name = "final_url", length = 1000)
+    private String finalUrl;
+
+    @Column(name = "verified_application_url", length = 1000)
+    private String verifiedApplicationUrl;
+
+    @Column(name = "application_url_status", length = 50)
+    private String applicationUrlStatus = "VERIFIED_ACTIVE";
 
     @Column(name = "source", length = 100)
     private String source = "Adzuna";
@@ -60,6 +75,24 @@ public class Job {
     @Column(name = "is_2026_eligible")
     private Boolean is2026Eligible = true;
 
+    @Column(name = "graduation_eligible")
+    private Boolean graduationEligible = true;
+
+    @Column(name = "experience_min")
+    private Integer experienceMin = 0;
+
+    @Column(name = "experience_max")
+    private Integer experienceMax = 1;
+
+    @Column(name = "experience_text", length = 255)
+    private String experienceText = "0–1 years / Fresher";
+
+    @Column(name = "eligibility_status", length = 50)
+    private String eligibilityStatus = "ELIGIBLE";
+
+    @Column(name = "eligibility_reason", columnDefinition = "TEXT")
+    private String eligibilityReason;
+
     @Column(name = "skills", columnDefinition = "TEXT")
     private String skills;
 
@@ -70,7 +103,7 @@ public class Job {
     private String employmentType = "Full Time";
 
     @Column(name = "relevance_score")
-    private Integer relevanceScore = 85;
+    private Integer relevanceScore = 88;
 
     @Column(name = "relevance_tier", length = 50)
     private String relevanceTier = "RELEVANT";
@@ -100,6 +133,14 @@ public class Job {
 
     public void setExternalId(String externalId) {
         this.externalId = externalId;
+    }
+
+    public String getSourceJobId() {
+        return sourceJobId;
+    }
+
+    public void setSourceJobId(String sourceJobId) {
+        this.sourceJobId = sourceJobId;
     }
 
     public String getTitle() {
@@ -156,6 +197,38 @@ public class Job {
 
     public void setApplyUrl(String applyUrl) {
         this.applyUrl = applyUrl;
+    }
+
+    public String getOriginalUrl() {
+        return originalUrl != null ? originalUrl : applyUrl;
+    }
+
+    public void setOriginalUrl(String originalUrl) {
+        this.originalUrl = originalUrl;
+    }
+
+    public String getFinalUrl() {
+        return finalUrl != null ? finalUrl : applyUrl;
+    }
+
+    public void setFinalUrl(String finalUrl) {
+        this.finalUrl = finalUrl;
+    }
+
+    public String getVerifiedApplicationUrl() {
+        return verifiedApplicationUrl != null ? verifiedApplicationUrl : (companyCareerUrl != null ? companyCareerUrl : applyUrl);
+    }
+
+    public void setVerifiedApplicationUrl(String verifiedApplicationUrl) {
+        this.verifiedApplicationUrl = verifiedApplicationUrl;
+    }
+
+    public String getApplicationUrlStatus() {
+        return applicationUrlStatus;
+    }
+
+    public void setApplicationUrlStatus(String applicationUrlStatus) {
+        this.applicationUrlStatus = applicationUrlStatus;
     }
 
     public String getSource() {
@@ -220,6 +293,54 @@ public class Job {
 
     public void setIs2026Eligible(Boolean eligible2026) {
         is2026Eligible = eligible2026;
+    }
+
+    public Boolean getGraduationEligible() {
+        return graduationEligible;
+    }
+
+    public void setGraduationEligible(Boolean graduationEligible) {
+        this.graduationEligible = graduationEligible;
+    }
+
+    public Integer getExperienceMin() {
+        return experienceMin;
+    }
+
+    public void setExperienceMin(Integer experienceMin) {
+        this.experienceMin = experienceMin;
+    }
+
+    public Integer getExperienceMax() {
+        return experienceMax;
+    }
+
+    public void setExperienceMax(Integer experienceMax) {
+        this.experienceMax = experienceMax;
+    }
+
+    public String getExperienceText() {
+        return experienceText;
+    }
+
+    public void setExperienceText(String experienceText) {
+        this.experienceText = experienceText;
+    }
+
+    public String getEligibilityStatus() {
+        return eligibilityStatus;
+    }
+
+    public void setEligibilityStatus(String eligibilityStatus) {
+        this.eligibilityStatus = eligibilityStatus;
+    }
+
+    public String getEligibilityReason() {
+        return eligibilityReason;
+    }
+
+    public void setEligibilityReason(String eligibilityReason) {
+        this.eligibilityReason = eligibilityReason;
     }
 
     public String getSkills() {

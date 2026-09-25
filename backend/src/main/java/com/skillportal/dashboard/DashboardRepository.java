@@ -545,9 +545,10 @@ public class DashboardRepository {
         }, userId);
         dashboard.setCourseProgress(moduleProgress);
 
-        // 18. Heatmap & Notifications
+        // 18. Heatmap, Notifications & Resume Learning
         dashboard.setActivityHeatmap(getActivityHeatmap(userId));
         dashboard.setNotifications(getUpcomingAssignments());
+        dashboard.setResumeLearning(getResumeLearning(userId));
 
         return dashboard;
     }

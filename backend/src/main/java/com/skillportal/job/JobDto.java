@@ -9,6 +9,7 @@ import java.util.List;
 public class JobDto {
     private Long id;
     private String externalId;
+    private String sourceJobId;
     private String title;
     private String company;
     private String location;
@@ -16,6 +17,8 @@ public class JobDto {
     private BigDecimal salaryMin;
     private BigDecimal salaryMax;
     private String applyUrl;
+    private String verifiedApplicationUrl;
+    private String applicationUrlStatus;
     private String source;
     private String sources;
     private Instant postedAt;
@@ -24,6 +27,12 @@ public class JobDto {
     private Instant lastSeenAt;
     private Boolean isFresherEligible;
     private Boolean is2026Eligible;
+    private Boolean graduationEligible;
+    private Integer experienceMin;
+    private Integer experienceMax;
+    private String experienceText;
+    private String eligibilityStatus;
+    private String eligibilityReason;
     private List<String> skills;
     private String experienceLevel;
     private String employmentType;
@@ -39,6 +48,7 @@ public class JobDto {
         JobDto dto = new JobDto();
         dto.setId(job.getId());
         dto.setExternalId(job.getExternalId());
+        dto.setSourceJobId(job.getSourceJobId());
         dto.setTitle(job.getTitle());
         dto.setCompany(job.getCompany());
         dto.setLocation(job.getLocation());
@@ -46,6 +56,8 @@ public class JobDto {
         dto.setSalaryMin(job.getSalaryMin());
         dto.setSalaryMax(job.getSalaryMax());
         dto.setApplyUrl(job.getApplyUrl());
+        dto.setVerifiedApplicationUrl(job.getVerifiedApplicationUrl());
+        dto.setApplicationUrlStatus(job.getApplicationUrlStatus());
         dto.setSource(job.getSource());
         dto.setSources(job.getSources());
         dto.setPostedAt(job.getPostedAt());
@@ -54,6 +66,12 @@ public class JobDto {
         dto.setLastSeenAt(job.getLastSeenAt());
         dto.setIsFresherEligible(job.getIsFresherEligible());
         dto.setIs2026Eligible(job.getIs2026Eligible());
+        dto.setGraduationEligible(job.getGraduationEligible());
+        dto.setExperienceMin(job.getExperienceMin());
+        dto.setExperienceMax(job.getExperienceMax());
+        dto.setExperienceText(job.getExperienceText());
+        dto.setEligibilityStatus(job.getEligibilityStatus());
+        dto.setEligibilityReason(job.getEligibilityReason());
         dto.setExperienceLevel(job.getExperienceLevel());
         dto.setEmploymentType(job.getEmploymentType());
         dto.setRelevanceScore(job.getRelevanceScore());
@@ -96,6 +114,14 @@ public class JobDto {
 
     public void setExternalId(String externalId) {
         this.externalId = externalId;
+    }
+
+    public String getSourceJobId() {
+        return sourceJobId;
+    }
+
+    public void setSourceJobId(String sourceJobId) {
+        this.sourceJobId = sourceJobId;
     }
 
     public String getTitle() {
@@ -152,6 +178,22 @@ public class JobDto {
 
     public void setApplyUrl(String applyUrl) {
         this.applyUrl = applyUrl;
+    }
+
+    public String getVerifiedApplicationUrl() {
+        return verifiedApplicationUrl != null ? verifiedApplicationUrl : applyUrl;
+    }
+
+    public void setVerifiedApplicationUrl(String verifiedApplicationUrl) {
+        this.verifiedApplicationUrl = verifiedApplicationUrl;
+    }
+
+    public String getApplicationUrlStatus() {
+        return applicationUrlStatus;
+    }
+
+    public void setApplicationUrlStatus(String applicationUrlStatus) {
+        this.applicationUrlStatus = applicationUrlStatus;
     }
 
     public String getSource() {
@@ -216,6 +258,54 @@ public class JobDto {
 
     public void setIs2026Eligible(Boolean eligible2026) {
         is2026Eligible = eligible2026;
+    }
+
+    public Boolean getGraduationEligible() {
+        return graduationEligible;
+    }
+
+    public void setGraduationEligible(Boolean graduationEligible) {
+        this.graduationEligible = graduationEligible;
+    }
+
+    public Integer getExperienceMin() {
+        return experienceMin;
+    }
+
+    public void setExperienceMin(Integer experienceMin) {
+        this.experienceMin = experienceMin;
+    }
+
+    public Integer getExperienceMax() {
+        return experienceMax;
+    }
+
+    public void setExperienceMax(Integer experienceMax) {
+        this.experienceMax = experienceMax;
+    }
+
+    public String getExperienceText() {
+        return experienceText;
+    }
+
+    public void setExperienceText(String experienceText) {
+        this.experienceText = experienceText;
+    }
+
+    public String getEligibilityStatus() {
+        return eligibilityStatus;
+    }
+
+    public void setEligibilityStatus(String eligibilityStatus) {
+        this.eligibilityStatus = eligibilityStatus;
+    }
+
+    public String getEligibilityReason() {
+        return eligibilityReason;
+    }
+
+    public void setEligibilityReason(String eligibilityReason) {
+        this.eligibilityReason = eligibilityReason;
     }
 
     public List<String> getSkills() {

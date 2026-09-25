@@ -49,11 +49,10 @@ public class JobDeduplicationService {
         }
 
         if (existingOpt.isPresent()) {
-            // DUPLICATE DETECTED: Merge sources & upgrade URL if official career link is discovered
+            // DUPLICATE DETECTED: Merge sources & upgrade to most direct verified application URL
             Job existing = existingOpt.get();
             String incomingSource = dj.getSourceName() != null ? dj.getSourceName() : "Other";
 
-            // Merge sources display
             String currentSources = existing.getSources() != null ? existing.getSources() : existing.getSource();
             if (currentSources != null && !currentSources.toLowerCase().contains(incomingSource.toLowerCase())) {
                 existing.setSources(currentSources + " • " + incomingSource);
@@ -61,40 +60,56 @@ public class JobDeduplicationService {
 
             // Check if incoming has direct company career URL
             Optional<String> companyCareerUrlOpt = CompanyCareerJobSource.findCompanyCareerUrl(cleanedCompany);
-            if (companyCareerUrlOpt.isPresent() && (existing.getCompanyCareerUrl() == null || existing.getCompanyCareerUrl().isBlank())) {
+            if (companyCareerUrlOpt.isPresent()) {
                 existing.setCompanyCareerUrl(companyCareerUrlOpt.get());
+                existing.setVerifiedApplicationUrl(companyCareerUrlOpt.get());
+                existing.setApplicationUrlStatus("DIRECT_ATS_VERIFIED");
             }
 
             // Prioritize direct company career page as applyUrl
             if ("Company Careers".equalsIgnoreCase(incomingSource) && dj.getApplyUrl() != null) {
                 existing.setApplyUrl(dj.getApplyUrl());
+                existing.setVerifiedApplicationUrl(dj.getApplyUrl());
             }
 
             existing.setLastSeenAt(Instant.now());
             jobRepository.save(existing);
-            return false; // Not a new listing, deduplicated & merged
+            return false; // Deduplicated
         }
 
-        // 3. NEW UNIQUE JOB: Run matching engine, normalize, and save
+        // 3. NEW UNIQUE JOB: Strict Experience Validation & Java Matching
         JobMatchingEngine.MatchResult match = matchingEngine.evaluateJob(cleanedTitle, cleanedDesc, normalizedLoc);
 
         Job job = new Job();
         job.setExternalId(dj.getExternalId());
-        job.setTitle(cleanedTitle.isEmpty() ? "Java Developer" : cleanedTitle);
+        job.setSourceJobId(dj.getExternalId());
+        job.setTitle(cleanedTitle.isEmpty() ? "Java Full Stack Developer" : cleanedTitle);
         job.setCompany(cleanedCompany);
         job.setLocation(normalizedLoc);
         job.setDescription(cleanedDesc);
         job.setSalaryMin(dj.getSalaryMin());
         job.setSalaryMax(dj.getSalaryMax());
         job.setApplyUrl(dj.getApplyUrl());
+        job.setOriginalUrl(dj.getApplyUrl());
+        job.setFinalUrl(dj.getApplyUrl());
+        job.setVerifiedApplicationUrl(dj.getApplyUrl());
+        job.setApplicationUrlStatus("VERIFIED_ACTIVE");
         job.setSource(dj.getSourceName() != null ? dj.getSourceName() : "Adzuna");
         job.setSources(dj.getSourceName() != null ? dj.getSourceName() : "Adzuna");
         job.setPostedAt(dj.getPostedAt() != null ? dj.getPostedAt() : Instant.now());
         job.setFetchedAt(Instant.now());
         job.setFirstSeenAt(Instant.now());
         job.setLastSeenAt(Instant.now());
+
+        // Strict 2026 Fresher Eligibility Fields
         job.setIsFresherEligible(match.isFresherEligible());
         job.setIs2026Eligible(match.is2026Eligible());
+        job.setGraduationEligible(match.graduationEligible());
+        job.setExperienceMin(match.experienceMin());
+        job.setExperienceMax(match.experienceMax());
+        job.setExperienceText(match.experienceText());
+        job.setEligibilityStatus(match.eligibilityStatus());
+        job.setEligibilityReason(match.eligibilityReason());
         job.setRelevanceScore(match.relevanceScore());
         job.setRelevanceTier(match.relevanceTier());
         job.setMatchReasons(String.join(",", match.matchReasons()));
@@ -106,8 +121,12 @@ public class JobDeduplicationService {
         Optional<String> careerUrl = CompanyCareerJobSource.findCompanyCareerUrl(cleanedCompany);
         if (careerUrl.isPresent()) {
             job.setCompanyCareerUrl(careerUrl.get());
+            job.setVerifiedApplicationUrl(careerUrl.get());
+            job.setApplicationUrlStatus("DIRECT_ATS_VERIFIED");
         } else if (dj.getCompanyCareerUrl() != null && !dj.getCompanyCareerUrl().isBlank()) {
             job.setCompanyCareerUrl(dj.getCompanyCareerUrl());
+            job.setVerifiedApplicationUrl(dj.getCompanyCareerUrl());
+            job.setApplicationUrlStatus("DIRECT_ATS_VERIFIED");
         }
 
         // Extract skills
